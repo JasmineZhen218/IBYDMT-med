@@ -10,8 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 class DatasetConceptTrainer(Protocol):
-    def __call__(self, config: Config, workdir=c.WORKDIR, device=c.DEVICE) -> List[str]:
-        ...
+    def __call__(
+        self, config: Config, workdir=c.WORKDIR, device=c.DEVICE
+    ) -> List[str]: ...
 
 
 class ClassConceptTrainer(Protocol):
@@ -21,8 +22,7 @@ class ClassConceptTrainer(Protocol):
         concept_class_name: str,
         workdir: str = c.WORKDIR,
         device: str = c.DEVICE,
-    ) -> List[str]:
-        ...
+    ) -> List[str]: ...
 
 
 class ImageConceptTrainer(Protocol):
@@ -32,8 +32,7 @@ class ImageConceptTrainer(Protocol):
         concept_image_idx: int,
         workdir: str = c.WORKDIR,
         device: str = c.DEVICE,
-    ) -> List[str]:
-        ...
+    ) -> List[str]: ...
 
 
 dataset_concept_trainers: Mapping[str, DatasetConceptTrainer] = {}

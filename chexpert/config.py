@@ -1,6 +1,6 @@
 import os
 
-from ibydmt.utils.config import Config, register_config
+from ibydmt import Config, register_config
 
 
 @register_config(name="chexpert")

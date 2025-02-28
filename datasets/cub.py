@@ -36,8 +36,8 @@ class CUB(VisionDataset):
 
         self.samples = make_dataset(image_root, wnid_to_idx, extensions=".jpg")
         self.image_idx = [
-            filename_to_idx["/".join(filename.split("/")[-2:])] 
-            for filename, _ in self.samples 
+            filename_to_idx["/".join(filename.split("/")[-2:])]
+            for filename, _ in self.samples
         ]
 
     def __len__(self):

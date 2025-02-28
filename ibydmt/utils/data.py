@@ -83,5 +83,4 @@ def embed_dataset(config: Config, train=True, workdir=c.WORKDIR, device=c.DEVICE
 
         embedding.extend(h)
         label.append(target)
-
     return embedding, label

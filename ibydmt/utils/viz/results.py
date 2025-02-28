@@ -30,8 +30,7 @@ class Colors:
 class ConceptPostProcessor(Protocol):
     def __call__(
         self, sorted_concepts: Iterable[str], class_name: str, image_idx: int
-    ) -> Iterable[str]:
-        ...
+    ) -> Iterable[str]: ...
 
 
 def _viz_results(

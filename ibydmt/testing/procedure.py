@@ -20,20 +20,19 @@ class StoppingCriteria(Enum):
 class ConditionalConceptSampler(Protocol):
     def __call__(
         self, z: Float[Array, "N M"], cond_idx: Iterable[int], **kwargs: dict
-    ) -> Float[Array, "N M"]:
-        ...
+    ) -> Float[Array, "N M"]: ...
 
 
 class ConditionalEmbeddingSampler(Protocol):
     def __call__(
         z: Float[Array, "N M"], cond_idx: Iterable[int], **kwargs: dict
-    ) -> Float[Array, "N D"]:
-        ...
+    ) -> Float[Array, "N D"]: ...
 
 
 class EmbeddingClassifier(Protocol):
-    def __call__(self, h: Float[Array, "N D"], **kwargs: dict) -> Float[Array, "N K"]:
-        ...
+    def __call__(
+        self, h: Float[Array, "N D"], **kwargs: dict
+    ) -> Float[Array, "N K"]: ...
 
 
 class SequentialTester:
