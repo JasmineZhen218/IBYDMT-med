@@ -22,20 +22,24 @@ class CheXpert(VisionDataset):
         self.root = root
         image_root = os.path.join(root, "CheXpert-v1.0-small")
         if train:
-            self.image_meta = pd.read_csv(
+            image_meta = pd.read_csv(
                 os.path.join(image_root, "train_small.csv"))[:10]
+            self.image_paths = list(image_meta['Path'])
+            self.image_labels = list(image_meta['No Finding'])
         else:
-            self.image_meta = pd.read_csv(
+            image_meta = pd.read_csv(
                 os.path.join(image_root, "valid.csv"))
+            self.image_paths = list(image_meta['Path'])
+            self.image_labels = list(image_meta['No Finding'])
         
 
     def __len__(self):
-        return len(self.image_meta)
+        return len(self.image_paths)
 
     def __getitem__(self, idx):
-        short_path = self.image_meta.loc[idx, 'Path']
+        short_path = self.image_paths[idx]
         image_path = os.path.join(self.root, short_path)
-        if self.image_meta.loc[idx, 'No Finding'] == 1: # normal
+        if self.image_labels[idx] == 1: # normal
             label = 0
         else:
             label = 1
