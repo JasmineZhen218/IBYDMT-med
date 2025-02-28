@@ -32,9 +32,9 @@ def setup_logging(level):
 
 def config():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config_name", type=str)
-    parser.add_argument("--test_type", type=str)
-    parser.add_argument("--concept_type", type=str)
+    parser.add_argument("--config_name", type=str, default = 'chexpert')
+    parser.add_argument("--test_type", type=str, default = 'local_cond')
+    parser.add_argument("--concept_type", type=str, default = 'dataset')
     parser.add_argument(
         "--workdir", type=str, default=os.path.dirname(os.path.realpath(__file__))
     )

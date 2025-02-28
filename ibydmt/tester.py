@@ -86,7 +86,7 @@ def run_tests(config: Config, testers: Iterable[SequentialTester]):
     fdr_postprocessor = FDRPostProcessor(config)
 
     stop_value = len(testers) / config.testing.significance_level
-    results = Parallel(n_jobs=-1)(
+    results = Parallel(n_jobs=1)(
         delayed(tester.test)(stop_on="value", stop_value=stop_value, return_wealth=True)
         for tester in testers
     )

@@ -134,7 +134,7 @@ class ZeroShotClassifier(EmbeddingClassifier):
         self.register_buffer("cbl", torch.zeros(len(self.classes), self.embed_dim))
 
     def forward(self, h):
-        return h @ self.cbl.T
+        return torch.tensor(h) @ self.cbl.T
 
     @torch.no_grad()
     def train_classifier(self, device=c.DEVICE):

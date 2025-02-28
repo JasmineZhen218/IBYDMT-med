@@ -30,8 +30,8 @@ def get_dataset(config, train=True, transform=None, workdir=c.WORKDIR):
     name = config.data.dataset.lower()
     root = os.path.join(workdir, "data")
     hostname = socket.gethostname()
-    if hostname == "io85":
-        root = os.path.join(root, hostname)
+    # if hostname == "io85":
+    #     root = os.path.join(root, hostname)
     return datasets[name](root, train=train, transform=transform)
 
 
