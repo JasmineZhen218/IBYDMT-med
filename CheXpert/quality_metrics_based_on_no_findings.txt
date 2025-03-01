@@ -1,0 +1,5 @@
+num_normal: 1143
+num_abnormal: 8857
+Accuracy: 0.686900
+Accuracy for normal: 0.181102
+Accuracy for abnormal: 0.752173
