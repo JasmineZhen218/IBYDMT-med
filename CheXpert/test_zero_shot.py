@@ -2,10 +2,8 @@ import tempfile
 from enum import Enum, unique
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
-
 import requests
 from torchvision.datasets.utils import check_integrity
-
 from health_multimodal.image import ImageInferenceEngine
 from health_multimodal.image.data.transforms import (
     create_chest_xray_transform_for_inference,
@@ -13,151 +11,112 @@ from health_multimodal.image.data.transforms import (
 from health_multimodal.image.model.pretrained import get_biovil_t_image_encoder
 from health_multimodal.text.utils import BertEncoderType, get_bert_inference
 from health_multimodal.vlp.inference_engine import ImageTextInferenceEngine
+import matplotlib.pyplot as plt
+from skimage import io
+import os
+from pathlib import Path
+import pandas as pd
+import warnings
+warnings.filterwarnings("ignore")
+from tqdm import tqdm
+from sklearn.metrics.pairwise import cosine_similarity
 
 RESIZE = 512
 CENTER_CROP_SIZE = 512
 
-
-@unique
-class ClassType(str, Enum):
-    """Enum for the different types of CXR abnormality classes."""
-
-    PNEUMONIA = "pneumonia"
-    NO_PNEUMONIA = "no_pneumonia"
-
-
-def _get_vlp_inference_engine() -> ImageTextInferenceEngine:
-    image_inference = ImageInferenceEngine(
+root = "/cis/home/zwang/IBYDMT-med/data"
+Predictions = []
+Labels = []
+Labels_2 = []
+True_Positives = []
+True_Positives_2 = []
+train_meta = os.path.join(root, "CheXpert-v1.0-small/train.csv")
+train_meta = pd.read_csv(train_meta)
+# img_txt_inference = _get_vlp_inference_engine()
+_image_inference = ImageInferenceEngine(
         image_model=get_biovil_t_image_encoder(),
         transform=create_chest_xray_transform_for_inference(
             resize=RESIZE, center_crop_size=CENTER_CROP_SIZE
         ),
     )
-    img_txt_inference = ImageTextInferenceEngine(
-        image_inference_engine=image_inference,
-        text_inference_engine=get_bert_inference(BertEncoderType.BIOVIL_T_BERT),
-    )
-    return img_txt_inference
+_text_inference = get_bert_inference(BertEncoderType.BIOVIL_T_BERT)
+
+for i in tqdm(range(10000)):
+    image_path = os.path.join(root, train_meta['Path'][i])
+    # get projected global embedding
+    image_features = _image_inference.get_projected_global_embedding(image_path=Path(image_path)).reshape(1, -1)
+    normal_text_features = _text_inference.get_embeddings_from_prompt("A normal chest X-ray")
+    abnormal_text_features = _text_inference.get_embeddings_from_prompt("An abnormal chest X-ray")
+
+    normal_score = cosine_similarity(image_features, normal_text_features)[0,0]
+    abnormal_score = cosine_similarity(image_features, abnormal_text_features)[0,0]
+    if normal_score > abnormal_score:
+        prediction = 'Normal'
+    else:
+        prediction = 'Abnormal'
+    if train_meta['No Finding'][i] == 1:
+        label = 'Normal'
+    else:
+        label = 'Abnormal'
+    if 1 in list(train_meta.iloc[i, 6:19]):
+        label_2 = 'Abnormal'
+    else:
+        label_2 = 'Normal'
+    Predictions.append(prediction)
+    Labels.append(label)
+    Labels_2.append(label_2)
+    if prediction == 'Abnormal' and label_2 == 'Abnormal':
+        True_Positives_2.append(train_meta['Path'][i])
+    if prediction == 'Abnormal' and label == 'Abnormal':
+        True_Positives.append(train_meta['Path'][i])
+        
+
+# write True Positives to a file
+with open("True_Positives_based_on_no_findings.txt", "w") as f:
+    for item in True_Positives:
+        f.write("%s\n" % item)
+f.close()
+with open("True_Positives_based_on_other_13.txt", "w") as f:
+    for item in True_Positives_2:
+        f.write("%s\n" % item)
+f.close()
+
+# write quality metrics to a file
+import numpy as np
+acc = np.sum(np.array(Predictions) == np.array(Labels)) / len(Predictions)
+num_normal = np.sum(np.array(Labels) == 'Normal')
+num_abnormal = np.sum(np.array(Labels) == 'Abnormal')
+with open("quality_metrics_based_on_no_findings.txt", "w") as f:
+    f.write("num_normal: %d\n" % num_normal)
+    f.write("num_abnormal: %d\n" % num_abnormal)
+    f.write("Accuracy: %f\n" % acc)
+    # acc by class
+    acc_normal = np.sum(np.array(Predictions)[np.array(Labels) == 'Normal'] == 'Normal') / num_normal
+    acc_abnormal = np.sum(np.array(Predictions)[np.array(Labels) == 'Abnormal'] == 'Abnormal') / num_abnormal
+    f.write("Accuracy for normal: %f\n" % acc_normal)
+    f.write("Accuracy for abnormal: %f\n" % acc_abnormal)
+f.close()
 
 
-def _get_default_text_prompts_for_pneumonia() -> Tuple[List, List]:
-    """
-    Get the default text prompts for presence and absence of pneumonia
-    """
-    pos_query = [
-        "Findings consistent with pneumonia",
-        "Findings suggesting pneumonia",
-        "This opacity can represent pneumonia",
-        "Findings are most compatible with pneumonia",
-    ]
-    neg_query = [
-        "There is no pneumonia",
-        "No evidence of pneumonia",
-        "No evidence of acute pneumonia",
-        "No signs of pneumonia",
-    ]
-
-    return pos_query, neg_query
-
-
-def save_img_from_url(
-    image_url: str, local_path: Union[str, Path], md5: Optional[str] = None
-) -> None:
-    """
-    Pull an image from a URL and save it to a local path
-    """
-    img_data = requests.get(image_url, timeout=30).content
-    with open(local_path, "wb") as handler:
-        handler.write(img_data)
-
-    if md5 is not None:
-        assert check_integrity(local_path, md5)
-
-
-def test_zero_shot_pneumonia_classification() -> None:
-    """
-    Checks latent similarity between text prompts and image embeddings for presence and absence of pneumonia
-    """
-    input_data = [
-        (
-            "https://openi.nlm.nih.gov/imgs/512/173/1777/CXR1777_IM-0509-1001.png",
-            "f140126fff5d7d9f4a9402afadcbbf99",
-            ClassType.PNEUMONIA,
-        ),  # noqa: E501
-        (
-            "https://openi.nlm.nih.gov/imgs/512/6/808/CXR808_IM-2341-2001.png",
-            "ee19699d4305d17beecad94762a2ebcc",
-            ClassType.PNEUMONIA,
-        ),  # noqa: E501
-        (
-            "https://openi.nlm.nih.gov/imgs/512/342/3951/CXR3951_IM-2019-1001.png",
-            "786d5d854b1f6be1d6a0c3392794497a",
-            ClassType.PNEUMONIA,
-        ),  # noqa: E501
-        (
-            "https://openi.nlm.nih.gov/imgs/512/16/2422/CXR2422_IM-0965-1001.png",
-            "84dd31c1b0cbaaf8e1c0004d8917a78d",
-            ClassType.PNEUMONIA,
-        ),  # noqa: E501
-        (
-            "https://openi.nlm.nih.gov/imgs/512/365/3172/CXR3172_IM-1494-1001.png",
-            "dc476e73d3fd3b178a5303f48221e9d5",
-            ClassType.NO_PNEUMONIA,
-        ),  # noqa: E501
-        (
-            "https://openi.nlm.nih.gov/imgs/512/161/1765/CXR1765_IM-0499-1001.png",
-            "fdc6d3753f853352b35f5edf4ee0873c",
-            ClassType.NO_PNEUMONIA,
-        ),  # noqa: E501
-        (
-            "https://openi.nlm.nih.gov/imgs/512/327/3936/CXR3936_IM-2007-1001.png",
-            "ef537c81a0d8c0ae618625970c122ecc",
-            ClassType.NO_PNEUMONIA,
-        ),  # noqa: E501
-        (
-            "https://openi.nlm.nih.gov/imgs/512/76/1279/CXR1279_IM-0185-1001.png",
-            "9d03d740dcb0e7e068eb5eb73355262e",
-            ClassType.NO_PNEUMONIA,
-        ),  # noqa: E501
-        (
-            "https://openi.nlm.nih.gov/imgs/512/5/5/CXR5_IM-2117-1003002.png",
-            "204a2c83f94a4d4e74b6cea43caabdf2",
-            ClassType.NO_PNEUMONIA,
-        ),  # noqa: E501
-        (
-            "https://openi.nlm.nih.gov/imgs/512/219/3828/CXR3828_IM-1932-1001.png",
-            "1260a14f197527030fa0cb6b2d6950b8",
-            ClassType.NO_PNEUMONIA,
-        ),  # noqa: E501
-        (
-            "https://openi.nlm.nih.gov/imgs/512/16/818/CXR818_IM-2349-1001.png",
-            "2756b3a746e54e72f1efbbed72c2f83b",
-            ClassType.PNEUMONIA,
-        ),  # noqa: E501
-        (
-            "https://openi.nlm.nih.gov/imgs/512/358/2363/CXR2363_IM-0926-1001.png",
-            "bcdc990161a5234e08d0595ed8a0bbf0",
-            ClassType.PNEUMONIA,
-        ),
-    ]  # noqa: E501
-
-    img_txt_inference = _get_vlp_inference_engine()
-    positive_prompts, negative_prompts = _get_default_text_prompts_for_pneumonia()
-
-    for cxr_url, md5, label_str in input_data:
-        suffix = Path(cxr_url).suffix
-        with tempfile.NamedTemporaryFile(suffix=suffix) as f:
-            image_path = Path(f.name)
-            save_img_from_url(cxr_url, image_path, md5=md5)
-
-            positive_score = img_txt_inference.get_similarity_score_from_raw_data(
-                image_path=image_path, query_text=positive_prompts
-            )
-            negative_score = img_txt_inference.get_similarity_score_from_raw_data(
-                image_path=image_path, query_text=negative_prompts
-            )
-
-            if label_str == ClassType.PNEUMONIA:
-                assert positive_score > negative_score
-            else:
-                assert negative_score > positive_score
+acc = np.sum(np.array(Predictions) == np.array(Labels_2)) / len(Predictions)
+num_normal = np.sum(np.array(Labels_2) == 'Normal')
+num_abnormal = np.sum(np.array(Labels_2) == 'Abnormal')
+with open("quality_metrics_based_on_other_13.txt", "w") as f:
+    f.write("num_normal: %d\n" % num_normal)
+    f.write("num_abnormal: %d\n" % num_abnormal)
+    f.write("Accuracy: %f\n" % acc)
+    # acc by class
+    acc_normal = np.sum(np.array(Predictions)[np.array(Labels_2) == 'Normal'] == 'Normal') / num_normal
+    acc_abnormal = np.sum(np.array(Predictions)[np.array(Labels_2) == 'Abnormal'] == 'Abnormal') / num_abnormal
+    f.write("Accuracy for normal: %f\n" % acc_normal)
+    f.write("Accuracy for abnormal: %f\n" % acc_abnormal)
+# acc by class
+# acc_normal = np.sum(np.array(Predictions)[np.array(Labels_2) == 'Normal'] == 'Normal') / num_normal
+# acc_abnormal = np.sum(np.array(Predictions)[np.array(Labels_2) == 'Abnormal'] == 'Abnormal') / num_abnormal
+# print("Accuracy for normal:", acc_normal)
+# print("Accuracy for abnormal:", acc_abnormal)
+#     if prediction == label:
+#         Accs.append(1)
+#     else:
+#         Accs.append(0)
+# print("Accuracy:", sum(Accs)/len(Accs))
