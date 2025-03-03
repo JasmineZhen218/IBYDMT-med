@@ -1,1 +1,1 @@
-from datasets import awa2, cub, imagenette, chexpert
+from datasets import awa2, cub, imagenette, chexpert, vindr

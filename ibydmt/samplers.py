@@ -173,12 +173,12 @@ class AttributeSampler(Sampler):
             device=device,
         )
 
-        semantics = self.dataset.semantics
-        embedding = self.dataset.embedding
+        self.semantics = self.dataset.semantics
+        self.embedding = self.dataset.embedding
 
-        complete_mask = np.sum(semantics < 0, axis=1) == 0
-        self.semantics = semantics[complete_mask]
-        self.embedding = embedding[complete_mask]
+        # complete_mask = np.sum(semantics < 0, axis=1) == 0
+        # self.semantics = semantics[complete_mask]
+        # self.embedding = embedding[complete_mask]
 
     def sample_embedding(self, z, cond_idx, m=1):
         Z_cond = self.semantics[:, cond_idx]

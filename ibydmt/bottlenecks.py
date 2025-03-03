@@ -161,3 +161,39 @@ class CUBAttributeBottleneck(ConceptBottleneck):
                 semantics[dataset_image_idx, concept_idx] = int(row["attribute_label"])
 
         return semantics
+
+
+@register_bottleneck(name="chexpert_attribute")
+class CheXpertAttributeBottleneck(ConceptBottleneck):
+    def __init__(
+        self,
+        config: Config,
+        concept_class_name: Optional[str] = None,
+        concept_image_idx: Optional[int] = None,
+        workdir=c.WORKDIR,
+    ):
+        super().__init__(
+            config,
+            concept_class_name=concept_class_name,
+            concept_image_idx=concept_image_idx,
+            workdir=workdir,
+        )
+        attribute_path = os.path.join(
+            workdir, "data", "CheXpert-v1.0-small", "train.csv"
+        )
+        attribute_df = pd.read_csv(attribute_path)
+        attribute_df.set_index("Path", inplace=True)
+        attribute_df[attribute_df.isna()] = 0
+        attribute_df[attribute_df == -1] = 0
+        self.attribute_df = attribute_df
+
+    def encode_dataset(self, train: bool, workdir=c.WORKDIR, device=c.DEVICE):
+        dataset = get_dataset(self.config, train=train, workdir=workdir)
+
+        semantics = np.empty((len(dataset), len(self.concepts)), dtype=int)
+        for idx, (path, _) in enumerate(dataset.samples):
+            image_attribute = self.attribute_df.loc[path]
+            for concept_idx, concept in enumerate(self.concepts):
+                semantics[idx, concept_idx] = int(image_attribute[concept])
+
+        return semantics

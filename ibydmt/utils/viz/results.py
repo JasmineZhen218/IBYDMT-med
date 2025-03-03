@@ -1,5 +1,6 @@
 import functools
 import os
+from PIL import Image
 from typing import Any, Callable, Iterable, Mapping, Optional, Protocol
 
 import matplotlib.pyplot as plt
@@ -7,6 +8,7 @@ import numpy as np
 import seaborn as sns
 
 from ibydmt.tester import get_local_test_idx, get_test_classes
+from ibydmt.utils.concept_data import get_dataset_with_concepts
 from ibydmt.utils.concepts import get_concepts
 from ibydmt.utils.config import ConceptType, Config
 from ibydmt.utils.config import Constants as c
@@ -147,9 +149,11 @@ def viz_local_results(
 
         for image_idx in class_text_idx:
             image, _ = dataset[image_idx]
+            if isinstance(image, str):
+                image = Image.open(image)
 
             _, ax = plt.subplots(figsize=(3, 3))
-            ax.imshow(image)
+            ax.imshow(image, cmap="gray")
             ax.axis("off")
             plt.savefig(
                 os.path.join(
@@ -343,6 +347,21 @@ def viz_results(
             ]
 
         concept_postprocessor = cub_vip_concept_postprocessor
+
+    if config.data.dataset.lower() == "chexpert":
+        dataset = get_dataset_with_concepts(config, workdir=workdir)
+        semantics = dataset.semantics
+
+        def chexpert_concept_postprocessor(
+            sorted_concepts: Iterable[str], class_name: str, image_idx: int
+        ):
+            assert concept_type == ConceptType.DATASET.value
+            return [
+                f"{c} ({semantics[image_idx, concept_idx]:d})"
+                for concept_idx, c in enumerate(sorted_concepts)
+            ]
+
+        concept_postprocessor = chexpert_concept_postprocessor
 
     for result in results:
         viz_fn(

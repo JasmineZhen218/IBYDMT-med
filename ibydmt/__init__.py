@@ -1,7 +1,8 @@
-from ibydmt.tester import ConceptTester
-from ibydmt.bottlenecks import register_bottleneck, get_bottleneck
-from ibydmt.classifiers import register_classifier, get_classifier
+from ibydmt.tester import ConceptTester, get_test_classes
+from ibydmt.bottlenecks import register_bottleneck, get_bottleneck, ConceptBottleneck
+from ibydmt.classifiers import register_classifier, get_classifier, get_predictions
 from ibydmt.multimodal import (
+    get_model,
     get_image_encoder,
     get_text_encoder,
     register_model,

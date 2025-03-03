@@ -1,7 +1,8 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
+from PIL import Image
 
-from ibydmt.classifiers import ZeroShotClassifier
+from ibydmt.classifiers import Classifier
 from ibydmt.samplers import get_sampler
 from ibydmt.tester import get_local_test_idx, sample_random_subset
 from ibydmt.utils.concept_data import get_dataset_with_concepts
@@ -100,9 +101,7 @@ def viz_local_dist(
     dataset = get_dataset(config, train=False, workdir=workdir)
     classes = dataset.classes
 
-    classifier = ZeroShotClassifier.load_or_train(
-        config, workdir=workdir, device=device
-    )
+    classifier = Classifier.from_pretrained(config, workdir=workdir, device=device)
 
     test_idx = get_local_test_idx(config, workdir=workdir)
     for class_name, class_test_idx in test_idx.items():
@@ -110,9 +109,11 @@ def viz_local_dist(
 
         for idx in class_test_idx:
             image, _ = dataset[idx]
+            if isinstance(image, str):
+                image = Image.open(image)
 
             _, ax = plt.subplots(figsize=(3, 3))
-            ax.imshow(image)
+            ax.imshow(image, cmap="gray")
             ax.set_xticks([])
             ax.set_yticks([])
             ax.set_title(class_name)
@@ -186,13 +187,13 @@ def viz_local_dist(
                     ax.set_xlabel(r"$\widehat{Y}_{\text{%s}}$" % class_name)
                     # ax.set_xlim(0.05, 0.45)
                     # ax.set_xticks([0.10, 0.20, 0.30, 0.40])
-                    ax.set_ylim(0, 16)
-                    if j == 0:
-                        ax.set_ylabel("Density")
-                        ax.set_yticks([0, 5, 10, 15])
-                    else:
-                        ax.set_ylabel("")
-                        ax.set_yticks([])
+                    # ax.set_ylim(0, 16)
+                    # if j == 0:
+                    #     ax.set_ylabel("Density")
+                    #     ax.set_yticks([0, 5, 10, 15])
+                    # else:
+                    #     ax.set_ylabel("")
+                    #     ax.set_yticks([])
                     ax.set_title(
                         "\n".join([f"{concept}", f"cardinality = {cardinality}"])
                     )

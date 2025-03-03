@@ -5,7 +5,9 @@ import random
 import numpy as np
 import torch
 
-import chexpert
+import configs
+import datasets
+import models
 from ibydmt.tester import ConceptTester
 
 

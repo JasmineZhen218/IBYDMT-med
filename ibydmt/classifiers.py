@@ -34,6 +34,14 @@ class Classifier(nn.Module):
         model.load_state_dict(torch.load(state_path, map_location=device))
         return model.eval()
 
+    @staticmethod
+    def get_predictions(config: Config, workdir=c.WORKDIR):
+        model = Classifier.from_pretrained(config, workdir)
+        prediction_path = model.prediction_path(workdir=workdir)
+        if not os.path.exists(prediction_path):
+            model.evaluate(workdir)
+        return pd.read_csv(prediction_path)
+
     @abstractmethod
     def prediction_path(self, workdir=c.WORKDIR):
         pass
@@ -119,11 +127,7 @@ def get_classifier(config: Config) -> Classifier:
 
 
 def get_predictions(config: Config, workdir=c.WORKDIR):
-    model = Classifier.from_pretrained(config, workdir)
-    prediction_path = model.prediction_path(workdir=workdir)
-    if not os.path.exists(prediction_path):
-        model.evaluate(workdir)
-    return pd.read_csv(prediction_path)
+    return Classifier.get_predictions(config, workdir)
 
 
 @register_classifier(name="zeroshot")
@@ -134,7 +138,9 @@ class ZeroShotClassifier(EmbeddingClassifier):
         self.register_buffer("cbl", torch.zeros(len(self.classes), self.embed_dim))
 
     def forward(self, h):
-        return torch.tensor(h) @ self.cbl.T
+        if not isinstance(h, torch.Tensor):
+            h = torch.tensor(h)
+        return h @ self.cbl.T
 
     @torch.no_grad()
     def train_classifier(self, device=c.DEVICE):
@@ -146,8 +152,9 @@ class ZeroShotClassifier(EmbeddingClassifier):
         encode_text = get_text_encoder(self.config, device=device)
 
         dataset = get_dataset(self.config)
-        classes = dataset.classes
-        prompts = [f"A photo of a {class_name}" for class_name in classes]
+        prompts = dataset.prompts
+        # classes = dataset.classes
+        # prompts = [f"A photo of a {class_name}" for class_name in classes]
 
         cbl = encode_text(prompts).float()
         cbl = cbl / torch.linalg.norm(cbl, dim=1, keepdim=True)

@@ -201,9 +201,6 @@ def test_local_cond(config: Config, concept_type: str, workdir: str = c.WORKDIR)
 
     classes = dataset.classes
     for class_name, class_test_idx in test_idx.items():
-        if class_name not in ["Cardinal", "Blue Jay", "Frigatebird"]:
-            continue
-
         class_idx = classes.index(class_name)
 
         class_test = list(product(class_test_idx, cardinalities))
